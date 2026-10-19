@@ -10,6 +10,6 @@ if not defined VCINSTALLDIR (
   for /f "usebackq delims=" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -property installationPath`) do call "%%i\VC\Auxiliary\Build\vcvars64.bat" >nul
 )
 set VSLANG=1033
-cmake -S "%ROOT%" -B "%BUILD%" -G Ninja -DCMAKE_BUILD_TYPE=Release -DTRANSCRIBE_CUDA=ON -DTRANSCRIBE_ENGINE_DLL=ON -DTRANSCRIBE_BUILD_TESTS=OFF -DTRANSCRIBE_BUILD_EXAMPLES=ON "-DCMAKE_CUDA_ARCHITECTURES=75-real;80-real;86-real;89-real;90-real;100-real;120-real" || exit /b 1
+cmake -S "%ROOT%" -B "%BUILD%" -G Ninja -DCMAKE_BUILD_TYPE=Release -DTRANSCRIBE_CUDA=ON -DTRANSCRIBE_ENGINE_DLL=ON -DGGML_CUDA_NCCL=OFF -DTRANSCRIBE_BUILD_TESTS=OFF -DTRANSCRIBE_BUILD_EXAMPLES=ON "-DCMAKE_CUDA_ARCHITECTURES=75-real;80-real;86-real;89-real;90-real;100-real;120-real" || exit /b 1
 cmake --build "%BUILD%" --config Release || exit /b 1
 echo [OK] %BUILD%\bin\transcribe_engine.dll
