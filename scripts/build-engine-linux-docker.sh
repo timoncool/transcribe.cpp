@@ -18,6 +18,8 @@ if [ "${1:-}" = "--inside" ]; then
   git -c safe.directory=/src -C /src archive HEAD | tar -x -C /cache/src
   cd /cache/src
   echo "[..] configure ($ARCHS)"
+  # settings come from this script alone, not from a cache an earlier run left
+  rm -f /cache/build/CMakeCache.txt
   cmake -B /cache/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DTRANSCRIBE_CUDA=ON -DTRANSCRIBE_ENGINE_DLL=ON \
     -DTRANSCRIBE_BUILD_TESTS=OFF -DTRANSCRIBE_BUILD_EXAMPLES=OFF -DTRANSCRIBE_USE_SYSTEM_BLAS=OFF \
     -DGGML_CUDA_NCCL=OFF -DCMAKE_CUDA_ARCHITECTURES="$ARCHS" \
