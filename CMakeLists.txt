@@ -156,6 +156,20 @@ option(TRANSCRIBE_USE_SYSTEM_BLAS "Link non-Apple system BLAS for the host decod
 # transcribe_init_backends(). Requires TRANSCRIBE_BUILD_SHARED=ON.
 option(TRANSCRIBE_GGML_BACKEND_DL "Build ggml backends as loadable modules" OFF)
 
+# One self-contained engine library for a host that loads it at run time beside
+# other ggml-based engines: libtranscribe and every ggml backend are linked into
+# transcribe_engine (.dll / .so) statically, and only the TRANSCRIBE_API surface
+# is exported. A process that already holds another ggml (a TTS engine's
+# ggml.dll) then cannot have it substituted for this one by the loader.
+# Builds on the static posture (TRANSCRIBE_BUILD_SHARED=OFF).
+option(TRANSCRIBE_ENGINE_DLL "Build transcribe_engine: libtranscribe + ggml in one shared library" OFF)
+if(TRANSCRIBE_ENGINE_DLL)
+    if(TRANSCRIBE_BUILD_SHARED)
+        message(FATAL_ERROR "TRANSCRIBE_ENGINE_DLL links ggml statically: set TRANSCRIBE_BUILD_SHARED=OFF")
+    endif()
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+endif()
+
 # Conservative x86 floor: default GGML_NATIVE plus EVERY x86 SIMD tier to
 # OFF so the one binary runs on baseline x86-64 without SIGILL. This is the
 # single switch behind every official-wheel CPU posture (the per-flag lists

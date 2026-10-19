@@ -197,7 +197,11 @@ endif()
 # MSVC consumer that includes transcribe.h links against __imp_* thunks the
 # archive never provides (LNK2019). Bindgen/Python FFIs carry no __declspec and
 # are unaffected. No-op off Windows/MSVC (the header guard is _WIN32-only).
-if(NOT TRANSCRIBE_BUILD_SHARED)
+if(TRANSCRIBE_ENGINE_DLL)
+    # the archive's own objects export the API (TRANSCRIBE_BUILD); its static
+    # consumers (tests, examples) still link it without dllimport thunks
+    target_compile_definitions(transcribe INTERFACE TRANSCRIBE_STATIC)
+elseif(NOT TRANSCRIBE_BUILD_SHARED)
     target_compile_definitions(transcribe PUBLIC TRANSCRIBE_STATIC)
 endif()
 
@@ -305,3 +309,17 @@ if(WIN32)
 endif()
 
 transcribe_apply_warnings(transcribe)
+
+# transcribe_engine: the whole archive in one shared library (see
+# TRANSCRIBE_ENGINE_DLL in the top-level CMakeLists.txt).
+if(TRANSCRIBE_ENGINE_DLL)
+    add_library(transcribe_engine SHARED engine/transcribe_engine.c)
+    target_link_libraries(transcribe_engine PRIVATE transcribe ggml)
+    if(MSVC)
+        target_link_options(transcribe_engine PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:transcribe>")
+    elseif(APPLE)
+        target_link_options(transcribe_engine PRIVATE "LINKER:-force_load,$<TARGET_FILE:transcribe>")
+    else()
+        target_link_options(transcribe_engine PRIVATE "LINKER:--whole-archive" "$<TARGET_FILE:transcribe>" "LINKER:--no-whole-archive" "LINKER:--exclude-libs,libggml.a:libggml-base.a:libggml-cpu.a:libggml-cuda.a")
+    endif()
+endif()
