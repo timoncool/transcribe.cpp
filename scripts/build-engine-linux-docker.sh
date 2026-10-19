@@ -20,8 +20,8 @@ if [ "${1:-}" = "--inside" ]; then
   echo "[..] configure ($ARCHS)"
   cmake -B /cache/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DTRANSCRIBE_CUDA=ON -DTRANSCRIBE_ENGINE_DLL=ON \
     -DTRANSCRIBE_BUILD_TESTS=OFF -DTRANSCRIBE_BUILD_EXAMPLES=OFF -DTRANSCRIBE_USE_SYSTEM_BLAS=OFF \
-    -DCMAKE_CUDA_ARCHITECTURES="$ARCHS" \
-    '-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-rpath,$ORIGIN:$ORIGIN/../higgs-engine' >/dev/null
+    -DGGML_CUDA_NCCL=OFF -DCMAKE_CUDA_ARCHITECTURES="$ARCHS" \
+    '-DCMAKE_BUILD_RPATH=$ORIGIN;$ORIGIN/../higgs-engine' >/dev/null
   echo "[..] build"
   cmake --build /cache/build -j "$(( $(nproc) * 4 / 5 ))" 2>&1 | tail -3
   cp /cache/build/src/libtranscribe_engine.so /out/
