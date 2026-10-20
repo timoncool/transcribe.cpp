@@ -1,0 +1,25 @@
+name: engine-macos
+
+# The macOS builds of transcribe_engine (scripts/build-engine-macos.sh). Runs only when the engine-macos branch is
+# pushed; the libraries are kept for a day, to be attached to an engine-* release.
+on:
+  push:
+    branches: [engine-macos]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        backend: [metal, cpu]
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - run: command -v ninja >/dev/null || brew install ninja
+      - run: bash scripts/build-engine-macos.sh out ${{ matrix.backend }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: transcribe-engine-macos-${{ matrix.backend }}
+          path: out/libtranscribe_engine.dylib
+          retention-days: 1
+          if-no-files-found: error
