@@ -62,6 +62,7 @@ SPEC_KEYS = {
     "usage",                 # extra usage prose for an unusual model
     "upstream_card_commit",  # revision of the upstream card that was quoted
     "default_quant",         # override the Q8_0 default
+    "license_notes",         # licence terms/notices beyond the inherited name
 }
 CAP_FLAGS = ("streaming", "translate", "lang_detect")
 DEFAULT_QUANT = "Q8_0"
