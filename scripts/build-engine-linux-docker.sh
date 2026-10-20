@@ -29,8 +29,10 @@ if [ "${1:-}" = "--inside" ]; then
         curl -fsSL "https://sdk.lunarg.com/sdk/download/$VULKAN_SDK_VERSION/linux/vulkansdk-linux-x86_64-$VULKAN_SDK_VERSION.tar.xz" | tar -xJ -C "$sdk" --strip-components=1
       fi
       export VULKAN_SDK="$sdk/x86_64" PATH="$sdk/x86_64/bin:$PATH"
-      # the SDK keeps its loader apart since 1.4.3xx; the library links libvulkan.so.1, which the drivers' loader serves
-      flags=(-DTRANSCRIBE_VULKAN=ON "-DVulkan_LIBRARY=$sdk/x86_64/lib/VulkanLoader/lib/libvulkan.so" '-DCMAKE_BUILD_RPATH=$ORIGIN') ;;
+      # the SDK keeps its loader apart since 1.4.3xx: linked from the system folder it adds nothing to RUNPATH, and at
+      # run time libvulkan.so.1 is the loader of the machine's drivers
+      cp -P "$sdk"/x86_64/lib/VulkanLoader/lib/libvulkan.so* /usr/lib/x86_64-linux-gnu/
+      flags=(-DTRANSCRIBE_VULKAN=ON -DVulkan_LIBRARY=/usr/lib/x86_64-linux-gnu/libvulkan.so '-DCMAKE_BUILD_RPATH=$ORIGIN') ;;
     cpu) flags=('-DCMAKE_BUILD_RPATH=$ORIGIN') ;;
     *) echo "[ERROR] backend $backend: cuda, vulkan or cpu"; exit 1 ;;
   esac
