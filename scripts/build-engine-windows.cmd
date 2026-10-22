@@ -16,7 +16,8 @@ if not defined VCINSTALLDIR (
   for /f "usebackq delims=" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -property installationPath`) do call "%%i\VC\Auxiliary\Build\vcvars64.bat" >nul
 )
 set VSLANG=1033
-set FLAGS=-DTRANSCRIBE_ENGINE_DLL=ON -DTRANSCRIBE_BUILD_TESTS=OFF -DTRANSCRIBE_BUILD_EXAMPLES=ON
+rem never native: users' processors are not this one; AVX2 is the floor every build takes, the host checks for it before loading
+set FLAGS=-DTRANSCRIBE_ENGINE_DLL=ON -DTRANSCRIBE_BUILD_TESTS=OFF -DTRANSCRIBE_BUILD_EXAMPLES=ON -DTRANSCRIBE_X86_CONSERVATIVE=ON -DGGML_SSE42=ON -DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON -DGGML_BMI2=ON
 if "%BACKEND%"=="cuda" set FLAGS=%FLAGS% -DTRANSCRIBE_CUDA=ON -DGGML_CUDA_NCCL=OFF "-DCMAKE_CUDA_ARCHITECTURES=75-real;80-real;86-real;89-real;90-real;100-real;120-real"
 if "%BACKEND%"=="vulkan" set FLAGS=%FLAGS% -DTRANSCRIBE_VULKAN=ON
 if not "%BACKEND%"=="cuda" if not "%BACKEND%"=="vulkan" if not "%BACKEND%"=="cpu" (

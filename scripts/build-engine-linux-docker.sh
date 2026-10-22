@@ -43,7 +43,7 @@ if [ "${1:-}" = "--inside" ]; then
   # settings come from this script alone, not from a cache an earlier run left
   rm -rf "/cache/build-$backend/CMakeCache.txt"
   cmake -B "/cache/build-$backend" -G Ninja -DCMAKE_BUILD_TYPE=Release -DTRANSCRIBE_ENGINE_DLL=ON \
-    -DTRANSCRIBE_BUILD_TESTS=OFF -DTRANSCRIBE_BUILD_EXAMPLES=OFF -DTRANSCRIBE_USE_SYSTEM_BLAS=OFF "${flags[@]}" >/dev/null
+    -DTRANSCRIBE_BUILD_TESTS=OFF -DTRANSCRIBE_BUILD_EXAMPLES=OFF -DTRANSCRIBE_USE_SYSTEM_BLAS=OFF -DTRANSCRIBE_X86_CONSERVATIVE=ON -DGGML_SSE42=ON -DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON -DGGML_BMI2=ON "${flags[@]}" >/dev/null
   echo "[..] build"
   cmake --build "/cache/build-$backend" -j "$(( $(nproc) * 4 / 5 ))" 2>&1 | tail -3
   cp "/cache/build-$backend/src/libtranscribe_engine.so" /out/
