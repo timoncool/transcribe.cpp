@@ -3,10 +3,12 @@
 # an Ubuntu 22.04 container (glibc 2.35: runs there and on anything newer) from the committed HEAD.
 #   cuda (default): CUDA 13.3, machine code for every listed architecture and no PTX; its RUNPATH looks beside it and in
 #                   ../higgs-engine, where the CUDA runtime and cuBLAS are kept by the host application.
+#   cuda12:         CUDA 12.9, sm 52/60/61/70/75/80/86/89/90/120a and no PTX, for the cards and drivers CUDA 13 does not
+#                   run; its RUNPATH looks beside it and in ../cuda12-runtime, where the host keeps cudart and cuBLAS 12.
 #   vulkan:         Vulkan and the CPU, for AMD and Intel cards; built against the LunarG Vulkan SDK (Ubuntu 22.04 has no
 #                   glslc), the Vulkan loader of the system's drivers at run time.
 #   cpu:            the CPU alone.
-#   scripts/build-engine-linux-docker.sh <output folder> [cache folder] [cuda|vulkan|cpu]
+#   scripts/build-engine-linux-docker.sh <output folder> [cache folder] [cuda|cuda12|vulkan|cpu]
 set -euo pipefail
 
 ARCHS="75-real;80-real;86-real;89-real;90-real;100-real;120-real"
@@ -21,6 +23,9 @@ if [ "${1:-}" = "--inside" ]; then
   flags=()
   case "$backend" in
     cuda) flags=(-DTRANSCRIBE_CUDA=ON -DGGML_CUDA_NCCL=OFF -DCMAKE_CUDA_ARCHITECTURES="$ARCHS" '-DCMAKE_BUILD_RPATH=$ORIGIN;$ORIGIN/../higgs-engine') ;;
+    cuda12) flags=(-DTRANSCRIBE_CUDA=ON -DGGML_CUDA_NCCL=OFF -DCMAKE_CUDA_FLAGS=-Wno-deprecated-gpu-targets
+                   "-DCMAKE_CUDA_ARCHITECTURES=52-real;60-real;61-real;70-real;75-real;80-real;86-real;89-real;90-real;120a-real"
+                   '-DCMAKE_BUILD_RPATH=$ORIGIN;$ORIGIN/../cuda12-runtime') ;;
     vulkan)
       sdk=/cache/vulkansdk-$VULKAN_SDK_VERSION
       if [ ! -x "$sdk/x86_64/bin/glslc" ]; then
@@ -34,7 +39,7 @@ if [ "${1:-}" = "--inside" ]; then
       cp -P "$sdk"/x86_64/lib/VulkanLoader/lib/libvulkan.so* /usr/lib/x86_64-linux-gnu/
       flags=(-DTRANSCRIBE_VULKAN=ON -DVulkan_LIBRARY=/usr/lib/x86_64-linux-gnu/libvulkan.so '-DCMAKE_BUILD_RPATH=$ORIGIN') ;;
     cpu) flags=('-DCMAKE_BUILD_RPATH=$ORIGIN') ;;
-    *) echo "[ERROR] backend $backend: cuda, vulkan or cpu"; exit 1 ;;
+    *) echo "[ERROR] backend $backend: cuda, cuda12, vulkan or cpu"; exit 1 ;;
   esac
   echo "[..] source $(git -c safe.directory=/src -C /src rev-parse --short HEAD), $backend"
   rm -rf /cache/src && mkdir -p /cache/src
@@ -61,4 +66,5 @@ mkdir -p "$out" "$cache"
 cp "$repo/scripts/build-engine-linux-docker.sh" "$out/.build-engine-linux-docker.sh"
 image=ubuntu:22.04
 [ "$backend" = "cuda" ] && image=nvidia/cuda:13.3.1-devel-ubuntu22.04
+[ "$backend" = "cuda12" ] && image=nvidia/cuda:12.9.1-devel-ubuntu22.04
 docker run --rm -v "$repo:/src:ro" -v "$(cd "$out" && pwd):/out" -v "$cache:/cache" "$image" bash /out/.build-engine-linux-docker.sh --inside "$backend"
