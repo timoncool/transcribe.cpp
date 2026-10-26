@@ -18,7 +18,7 @@ if [ "${1:-}" = "--inside" ]; then
   backend="$2"
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -q >/dev/null
-  apt-get install -y -q --no-install-recommends git ninja-build python3-pip ca-certificates build-essential curl xz-utils >/dev/null
+  apt-get install -y -q --no-install-recommends git ninja-build python3-pip ca-certificates build-essential curl xz-utils patchelf >/dev/null
   pip3 install -q "cmake>=3.28" >/dev/null
   flags=()
   case "$backend" in
@@ -52,6 +52,12 @@ if [ "${1:-}" = "--inside" ]; then
   echo "[..] build"
   cmake --build "/cache/build-$backend" -j "$(( $(nproc) * 4 / 5 ))" 2>&1 | tail -3
   cp "/cache/build-$backend/src/libtranscribe_engine.so" /out/
+  # the CUDA link adds the toolkit's library folder of this container; the user's machine has only the folders below
+  case "$backend" in
+    cuda) patchelf --set-rpath '$ORIGIN:$ORIGIN/../higgs-engine' /out/libtranscribe_engine.so ;;
+    cuda12) patchelf --set-rpath '$ORIGIN:$ORIGIN/../cuda12-runtime' /out/libtranscribe_engine.so ;;
+    *) patchelf --set-rpath '$ORIGIN' /out/libtranscribe_engine.so ;;
+  esac
   readelf -d /out/libtranscribe_engine.so | grep -E 'NEEDED|RUNPATH'
   sha256sum /out/libtranscribe_engine.so
   echo "[OK] libtranscribe_engine.so ($backend)"
