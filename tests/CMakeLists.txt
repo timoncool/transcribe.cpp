@@ -266,6 +266,23 @@ transcribe_apply_warnings(transcribe_prefill_chunk_mask_unit)
 add_test(NAME transcribe_prefill_chunk_mask_unit COMMAND transcribe_prefill_chunk_mask_unit)
 
 # -----------------------------------------------------------------------------
+# granite_nar BPE CTC pool: in-graph pooled head vs the frame-level reference
+# (pure host, no model)
+
+add_executable(transcribe_granite_nar_bpe_pool_unit
+    granite_nar_bpe_pool_unit.cpp)
+
+target_link_libraries(transcribe_granite_nar_bpe_pool_unit PRIVATE transcribe ggml)
+
+target_include_directories(transcribe_granite_nar_bpe_pool_unit PRIVATE
+    ${CMAKE_SOURCE_DIR}/src)
+
+transcribe_apply_warnings(transcribe_granite_nar_bpe_pool_unit)
+
+add_test(NAME transcribe_granite_nar_bpe_pool_unit
+    COMMAND transcribe_granite_nar_bpe_pool_unit)
+
+# -----------------------------------------------------------------------------
 # Per-run decode budget rule (pure host, no model)
 
 add_executable(transcribe_decode_budget_unit
