@@ -47,20 +47,24 @@ if [ "${1:-}" = "--inside" ]; then
   cd /cache/src
   # settings come from this script alone, not from a cache an earlier run left
   rm -rf "/cache/build-$backend/CMakeCache.txt"
-  cmake -B "/cache/build-$backend" -G Ninja -DCMAKE_BUILD_TYPE=Release -DTRANSCRIBE_ENGINE_DLL=ON \
-    -DTRANSCRIBE_BUILD_TESTS=OFF -DTRANSCRIBE_BUILD_EXAMPLES=OFF -DTRANSCRIBE_USE_SYSTEM_BLAS=OFF -DTRANSCRIBE_X86_CONSERVATIVE=ON -DGGML_SSE42=ON -DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON -DGGML_BMI2=ON "${flags[@]}" >/dev/null
+  cmake -B "/cache/build-$backend" -G Ninja -DCMAKE_BUILD_TYPE=Release -DTRANSCRIBE_BUILD_SHARED=ON -DTRANSCRIBE_GGML_BACKEND_DL=ON -DGGML_CPU_ALL_VARIANTS=ON -DGGML_NATIVE=OFF \
+    -DTRANSCRIBE_BUILD_TESTS=OFF -DTRANSCRIBE_BUILD_EXAMPLES=OFF -DTRANSCRIBE_USE_SYSTEM_BLAS=OFF "${flags[@]}" >/dev/null
   echo "[..] build"
   cmake --build "/cache/build-$backend" -j "$(( $(nproc) * 4 / 5 ))" 2>&1 | tail -3
-  cp "/cache/build-$backend/src/libtranscribe_engine.so" /out/
-  # the CUDA link adds the toolkit's library folder of this container; the user's machine has only the folders below
+  # module model (GGML_BACKEND_DL + all CPU variants): the engine library, ggml core, and the loadable backend modules
+  # (ggml-cpu-<variant>, ggml-cuda — no version suffix) all go beside each other; the engine loads the best CPU variant
+  # for this processor by cpuid, and a processor without AVX2 runs on the baseline module
+  find "/cache/build-$backend" \( -name 'libtranscribe*.so' -o -name 'libggml.so.0' -o -name 'libggml-base.so.0' -o -name 'libggml-cpu-*.so' -o -name 'libggml-cuda.so' \) -exec cp -L -t /out/ {} +
   case "$backend" in
-    cuda) patchelf --set-rpath '$ORIGIN:$ORIGIN/../higgs-engine' /out/libtranscribe_engine.so ;;
-    cuda12) patchelf --set-rpath '$ORIGIN:$ORIGIN/../cuda12-runtime' /out/libtranscribe_engine.so ;;
-    *) patchelf --set-rpath '$ORIGIN' /out/libtranscribe_engine.so ;;
+    cuda) rp='$ORIGIN:$ORIGIN/../higgs-engine' ;;
+    cuda12) rp='$ORIGIN:$ORIGIN/../cuda12-runtime' ;;
+    *) rp='$ORIGIN' ;;
   esac
-  readelf -d /out/libtranscribe_engine.so | grep -E 'NEEDED|RUNPATH'
-  sha256sum /out/libtranscribe_engine.so
-  echo "[OK] libtranscribe_engine.so ($backend)"
+  for f in /out/libtranscribe*.so /out/libggml*.so*; do [ -f "$f" ] && patchelf --set-rpath "$rp" "$f"; done
+  echo "cpu variants: $(ls /out/libggml-cpu-*.so 2>/dev/null | wc -l)"
+  ls -1 /out
+  sha256sum /out/*.so* 2>/dev/null
+  echo "[OK] transcribe module set ($backend)"
   exit 0
 fi
 
