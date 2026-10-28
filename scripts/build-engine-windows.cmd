@@ -1,5 +1,6 @@
 @echo off
-rem transcribe_engine.dll for Windows x64 (TRANSCRIBE_ENGINE_DLL: libtranscribe and ggml whole in one library).
+rem transcribe.dll for Windows x64 with ggml and its backend modules beside it (GGML_BACKEND_DL): a ggml-cpu per
+rem instruction level, of which the engine loads the one the processor scores highest, and the device's own module.
 rem   cuda (default): CUDA 13, machine code for every listed architecture and no PTX; the CUDA runtime and cuBLAS come
 rem                   from the host application.
 rem   cuda12:         CUDA 12.9 (D:\Projects\_tools\cuda-12.9, MSVC 14.44), sm 52/60/61/70/75/80/86/89/90/120a and no
@@ -16,7 +17,7 @@ set BACKEND=%~2
 if "%BACKEND%"=="" set BACKEND=cuda
 set VSLANG=1033
 set "VCVARS=C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
-rem never native: users' processors are not this one; AVX2 is the floor every build takes, the host checks for it before loading
+rem never native: users' processors are not this one; every CPU variant is built, so any x86-64 runs the engine
 set FLAGS=-DTRANSCRIBE_BUILD_SHARED=ON -DTRANSCRIBE_GGML_BACKEND_DL=ON -DGGML_CPU_ALL_VARIANTS=ON -DGGML_NATIVE=OFF -DTRANSCRIBE_BUILD_TESTS=OFF -DTRANSCRIBE_BUILD_EXAMPLES=OFF
 if /i not "%BACKEND%"=="cuda" if /i not "%BACKEND%"=="cuda12" if /i not "%BACKEND%"=="vulkan" if /i not "%BACKEND%"=="cpu" (
   echo [ERROR] backend %BACKEND%: cuda, cuda12, vulkan or cpu
@@ -49,4 +50,4 @@ goto :configure
 where cl >nul 2>&1 || (echo [ERROR] MSVC is not set up for %BACKEND% & exit /b 1)
 cmake --fresh -S "%ROOT%" -B "%BUILD%" -G Ninja -DCMAKE_BUILD_TYPE=Release %FLAGS% || exit /b 1
 cmake --build "%BUILD%" --config Release || exit /b 1
-echo [OK] %BUILD%\bin\transcribe_engine.dll (%BACKEND%)
+echo [OK] %BUILD%\bin\transcribe.dll (%BACKEND%)

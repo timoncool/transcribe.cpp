@@ -54,13 +54,14 @@ if [ "${1:-}" = "--inside" ]; then
   # module model (GGML_BACKEND_DL + all CPU variants): the engine library, ggml core, and the loadable backend modules
   # (ggml-cpu-<variant>, ggml-cuda — no version suffix) all go beside each other; the engine loads the best CPU variant
   # for this processor by cpuid, and a processor without AVX2 runs on the baseline module
-  find "/cache/build-$backend" \( -name 'libtranscribe*.so' -o -name 'libggml.so.0' -o -name 'libggml-base.so.0' -o -name 'libggml-cpu-*.so' -o -name 'libggml-cuda.so' \) -exec cp -L -t /out/ {} +
+  rm -f /out/*.so /out/*.so.*
+  find "/cache/build-$backend" \( -name 'libtranscribe.so' -o -name 'libggml.so.0' -o -name 'libggml-base.so.0' -o -name 'libggml-cpu-*.so' -o -name 'libggml-cuda.so' -o -name 'libggml-vulkan.so' \) -exec cp -L -t /out/ {} +
   case "$backend" in
     cuda) rp='$ORIGIN:$ORIGIN/../higgs-engine' ;;
     cuda12) rp='$ORIGIN:$ORIGIN/../cuda12-runtime' ;;
     *) rp='$ORIGIN' ;;
   esac
-  for f in /out/libtranscribe*.so /out/libggml*.so*; do [ -f "$f" ] && patchelf --set-rpath "$rp" "$f"; done
+  for f in /out/libtranscribe.so /out/libggml*.so*; do [ -f "$f" ] && patchelf --set-rpath "$rp" "$f"; done
   echo "cpu variants: $(ls /out/libggml-cpu-*.so 2>/dev/null | wc -l)"
   ls -1 /out
   sha256sum /out/*.so* 2>/dev/null
