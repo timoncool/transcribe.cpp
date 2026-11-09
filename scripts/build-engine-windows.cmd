@@ -1,6 +1,8 @@
 @echo off
 rem transcribe.dll for Windows x64 with ggml and its backend modules beside it (GGML_BACKEND_DL): a ggml-cpu per
 rem instruction level, of which the engine loads the one the processor scores highest, and the device's own module.
+rem ggml itself is transcribe-ggml.dll and transcribe-ggml-base.dll: a host that also loads another ggml-based engine
+rem (a TTS engine with its own ggml.dll) gets each engine its own ggml, whichever of them loads first.
 rem   cuda (default): CUDA 13, machine code for every listed architecture and no PTX; the CUDA runtime and cuBLAS come
 rem                   from the host application.
 rem   cuda12:         CUDA 12.9 (D:\Projects\_tools\cuda-12.9, MSVC 14.44), sm 52/60/61/70/75/80/86/89/90/120a and no
@@ -18,7 +20,7 @@ if "%BACKEND%"=="" set BACKEND=cuda
 set VSLANG=1033
 set "VCVARS=C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
 rem never native: users' processors are not this one; every CPU variant is built, so any x86-64 runs the engine
-set FLAGS=-DTRANSCRIBE_BUILD_SHARED=ON -DTRANSCRIBE_GGML_BACKEND_DL=ON -DGGML_CPU_ALL_VARIANTS=ON -DGGML_NATIVE=OFF -DTRANSCRIBE_BUILD_TESTS=OFF -DTRANSCRIBE_BUILD_EXAMPLES=OFF
+set FLAGS=-DTRANSCRIBE_BUILD_SHARED=ON -DTRANSCRIBE_GGML_BACKEND_DL=ON -DTRANSCRIBE_GGML_LIB_PREFIX=transcribe- -DGGML_CPU_ALL_VARIANTS=ON -DGGML_NATIVE=OFF -DTRANSCRIBE_BUILD_TESTS=OFF -DTRANSCRIBE_BUILD_EXAMPLES=OFF
 if /i not "%BACKEND%"=="cuda" if /i not "%BACKEND%"=="cuda12" if /i not "%BACKEND%"=="vulkan" if /i not "%BACKEND%"=="cpu" (
   echo [ERROR] backend %BACKEND%: cuda, cuda12, vulkan or cpu
   exit /b 1

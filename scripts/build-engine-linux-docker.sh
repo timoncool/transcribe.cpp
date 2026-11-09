@@ -1,6 +1,8 @@
 #!/bin/bash
-# libtranscribe_engine.so for Linux x86-64 (TRANSCRIBE_ENGINE_DLL: libtranscribe and ggml whole in one library), built in
-# an Ubuntu 22.04 container (glibc 2.35: runs there and on anything newer) from the committed HEAD.
+# libtranscribe.so for Linux x86-64 with ggml and its backend modules beside it (GGML_BACKEND_DL, a ggml-cpu per
+# instruction level), built in an Ubuntu 22.04 container (glibc 2.35: runs there and on anything newer) from the
+# committed HEAD. ggml itself is libtranscribe-ggml.so.0 and libtranscribe-ggml-base.so.0: a host that also loads another
+# ggml-based engine gets each engine its own ggml, whichever of them loads first.
 #   cuda (default): CUDA 13.3, machine code for every listed architecture and no PTX; its RUNPATH looks beside it and in
 #                   ../higgs-engine, where the CUDA runtime and cuBLAS are kept by the host application.
 #   cuda12:         CUDA 12.9, sm 52/60/61/70/75/80/86/89/90/120a and no PTX, for the cards and drivers CUDA 13 does not
@@ -47,7 +49,7 @@ if [ "${1:-}" = "--inside" ]; then
   cd /cache/src
   # settings come from this script alone, not from a cache an earlier run left
   rm -rf "/cache/build-$backend/CMakeCache.txt"
-  cmake -B "/cache/build-$backend" -G Ninja -DCMAKE_BUILD_TYPE=Release -DTRANSCRIBE_BUILD_SHARED=ON -DTRANSCRIBE_GGML_BACKEND_DL=ON -DGGML_CPU_ALL_VARIANTS=ON -DGGML_NATIVE=OFF \
+  cmake -B "/cache/build-$backend" -G Ninja -DCMAKE_BUILD_TYPE=Release -DTRANSCRIBE_BUILD_SHARED=ON -DTRANSCRIBE_GGML_BACKEND_DL=ON -DTRANSCRIBE_GGML_LIB_PREFIX=transcribe- -DGGML_CPU_ALL_VARIANTS=ON -DGGML_NATIVE=OFF \
     -DTRANSCRIBE_BUILD_TESTS=OFF -DTRANSCRIBE_BUILD_EXAMPLES=OFF -DTRANSCRIBE_USE_SYSTEM_BLAS=OFF "${flags[@]}" >/dev/null
   echo "[..] build"
   cmake --build "/cache/build-$backend" -j "$(( $(nproc) * 4 / 5 ))" 2>&1 | tail -3
@@ -55,13 +57,15 @@ if [ "${1:-}" = "--inside" ]; then
   # (ggml-cpu-<variant>, ggml-cuda — no version suffix) all go beside each other; the engine loads the best CPU variant
   # for this processor by cpuid, and a processor without AVX2 runs on the baseline module
   rm -f /out/*.so /out/*.so.*
-  find "/cache/build-$backend" \( -name 'libtranscribe.so' -o -name 'libggml.so.0' -o -name 'libggml-base.so.0' -o -name 'libggml-cpu-*.so' -o -name 'libggml-cuda.so' -o -name 'libggml-vulkan.so' \) -exec cp -L -t /out/ {} +
+  find "/cache/build-$backend" \( -name 'libtranscribe.so' -o -name 'libtranscribe-ggml.so.0' -o -name 'libtranscribe-ggml-base.so.0' -o -name 'libggml-cpu-*.so' -o -name 'libggml-cuda.so' -o -name 'libggml-vulkan.so' \) -exec cp -L -t /out/ {} +
   case "$backend" in
     cuda) rp='$ORIGIN:$ORIGIN/../higgs-engine' ;;
     cuda12) rp='$ORIGIN:$ORIGIN/../cuda12-runtime' ;;
     *) rp='$ORIGIN' ;;
   esac
-  for f in /out/libtranscribe.so /out/libggml*.so*; do [ -f "$f" ] && patchelf --set-rpath "$rp" "$f"; done
+  for f in /out/libtranscribe*.so* /out/libggml*.so*; do [ -f "$f" ] && patchelf --set-rpath "$rp" "$f"; done
+  [ -f /out/libtranscribe-ggml.so.0 ] && [ -f /out/libtranscribe-ggml-base.so.0 ] || { echo "[ERROR] the build gave no libtranscribe-ggml.so.0 / libtranscribe-ggml-base.so.0"; exit 1; }
+  if readelf -d /out/libtranscribe.so /out/libggml-*.so | grep -E 'NEEDED.*\[libggml(-base)?\.so'; then echo "[ERROR] a library still asks for ggml by its common name"; exit 1; fi
   echo "cpu variants: $(ls /out/libggml-cpu-*.so 2>/dev/null | wc -l)"
   ls -1 /out
   sha256sum /out/*.so* 2>/dev/null

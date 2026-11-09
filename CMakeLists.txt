@@ -156,6 +156,16 @@ option(TRANSCRIBE_USE_SYSTEM_BLAS "Link non-Apple system BLAS for the host decod
 # transcribe_init_backends(). Requires TRANSCRIBE_BUILD_SHARED=ON.
 option(TRANSCRIBE_GGML_BACKEND_DL "Build ggml backends as loadable modules" OFF)
 
+# The shared ggml and ggml-base libraries under names of this engine's own, for
+# a host that loads libtranscribe at run time beside another ggml-based engine.
+# The system loader gives a library asked for by its bare name (a DLL import, a
+# DT_NEEDED soname) the one of that name already in the process, so two engines
+# that each ship a "ggml" end up sharing whichever loaded first: the second one
+# fails to load or runs on a ggml of another build. The backend modules link to
+# these two and are themselves loaded by path, so they keep their names.
+# Empty (the default) leaves ggml's own names. Shared builds only.
+set(TRANSCRIBE_GGML_LIB_PREFIX "" CACHE STRING "Prefix of the shared ggml and ggml-base library names")
+
 # One self-contained engine library for a host that loads it at run time beside
 # other ggml-based engines: libtranscribe and every ggml backend are linked into
 # transcribe_engine (.dll / .so) statically, and only the TRANSCRIBE_API surface
@@ -463,6 +473,14 @@ endif()
 
 # ggml's CMake declares its own warning flags; let it.
 add_subdirectory(ggml)
+
+if(TRANSCRIBE_GGML_LIB_PREFIX)
+    if(NOT TRANSCRIBE_BUILD_SHARED)
+        message(FATAL_ERROR "TRANSCRIBE_GGML_LIB_PREFIX names shared libraries: set TRANSCRIBE_BUILD_SHARED=ON")
+    endif()
+    set_target_properties(ggml PROPERTIES OUTPUT_NAME "${TRANSCRIBE_GGML_LIB_PREFIX}ggml")
+    set_target_properties(ggml-base PROPERTIES OUTPUT_NAME "${TRANSCRIBE_GGML_LIB_PREFIX}ggml-base")
+endif()
 
 # -----------------------------------------------------------------------------
 # Subdirs
