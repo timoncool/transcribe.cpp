@@ -11,6 +11,8 @@
 #                   glslc), the Vulkan loader of the system's drivers at run time.
 #   cpu:            the CPU alone.
 #   scripts/build-engine-linux-docker.sh <output folder> [cache folder] [cuda|cuda12|vulkan|cpu]
+# BUILD_JOBS: parallel compile jobs (default four fifths of the processors); BUILD_MEMORY: the container's memory
+# limit (docker --memory, e.g. 24g), so the build cannot take the machine it runs on.
 set -euo pipefail
 
 ARCHS="75-real;80-real;86-real;89-real;90-real;100-real;120-real"
@@ -52,7 +54,7 @@ if [ "${1:-}" = "--inside" ]; then
   cmake -B "/cache/build-$backend" -G Ninja -DCMAKE_BUILD_TYPE=Release -DTRANSCRIBE_BUILD_SHARED=ON -DTRANSCRIBE_GGML_BACKEND_DL=ON -DTRANSCRIBE_GGML_LIB_PREFIX=transcribe- -DGGML_CPU_ALL_VARIANTS=ON -DGGML_NATIVE=OFF \
     -DTRANSCRIBE_BUILD_TESTS=OFF -DTRANSCRIBE_BUILD_EXAMPLES=OFF -DTRANSCRIBE_USE_SYSTEM_BLAS=OFF "${flags[@]}" >/dev/null
   echo "[..] build"
-  cmake --build "/cache/build-$backend" -j "$(( $(nproc) * 4 / 5 ))" 2>&1 | tail -3
+  cmake --build "/cache/build-$backend" -j "${BUILD_JOBS:-$(( $(nproc) * 4 / 5 ))}" 2>&1 | tail -3
   # module model (GGML_BACKEND_DL + all CPU variants): the engine library, ggml core, and the loadable backend modules
   # (ggml-cpu-<variant>, ggml-cuda — no version suffix) all go beside each other; the engine loads the best CPU variant
   # for this processor by cpuid, and a processor without AVX2 runs on the baseline module
@@ -82,4 +84,4 @@ cp "$repo/scripts/build-engine-linux-docker.sh" "$out/.build-engine-linux-docker
 image=ubuntu:22.04
 [ "$backend" = "cuda" ] && image=nvidia/cuda:13.3.1-devel-ubuntu22.04
 [ "$backend" = "cuda12" ] && image=nvidia/cuda:12.9.1-devel-ubuntu22.04
-docker run --rm -v "$repo:/src:ro" -v "$(cd "$out" && pwd):/out" -v "$cache:/cache" "$image" bash /out/.build-engine-linux-docker.sh --inside "$backend"
+docker run --rm -e BUILD_JOBS ${BUILD_MEMORY:+--memory "$BUILD_MEMORY"} -v "$repo:/src:ro" -v "$(cd "$out" && pwd):/out" -v "$cache:/cache" "$image" bash /out/.build-engine-linux-docker.sh --inside "$backend"
