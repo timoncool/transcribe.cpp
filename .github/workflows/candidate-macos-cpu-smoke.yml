@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
       - uses: actions/download-artifact@v4
         with:
           name: transcribe-engine-macos-metal
@@ -26,7 +26,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(uname -m)" = arm64
-          test "$(git rev-parse HEAD^)" = 274d105ee20dbe283c7d0954b810429e96f5e6e1
+          git diff --exit-code 274d105ee20dbe283c7d0954b810429e96f5e6e1 -- include src ggml samples
           cd candidate
           echo '7c3da6f37ae5be17300dfc52e34876a72df2dabd010d10b2aa48b7b562085f0a  libtranscribe_engine.dylib' | shasum -a 256 -c -
           otool -L libtranscribe_engine.dylib

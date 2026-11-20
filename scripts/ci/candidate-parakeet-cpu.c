@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
 
     const char *backend = transcribe_model_backend(model);
     printf("backend: %s\n", backend);
-    if (strcmp(backend, "cpu") != 0) {
+    if (strcmp(backend, "CPU") != 0 && strcmp(backend, "cpu") != 0) {
         fprintf(stderr, "Expected the CPU backend\n");
         return EXIT_FAILURE;
     }
