@@ -1,4 +1,4 @@
-name: Validate candidate Parakeet on Apple Silicon CPU
+name: Validate candidate Parakeet on macOS x86_64
 
 on:
   push:
@@ -10,28 +10,58 @@ permissions:
 
 jobs:
   parakeet:
-    runs-on: macos-15
+    name: Parakeet CPU (${{ matrix.mode }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mode: Intel
+            runner: macos-15-intel
+          - mode: Rosetta
+            runner: macos-15
+    runs-on: ${{ matrix.runner }}
+    env:
+      EXECUTION_MODE: ${{ matrix.mode }}
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Identify CPU execution mode
+        id: runner
+        run: |
+          set -euo pipefail
+          if [[ "$EXECUTION_MODE" = Rosetta ]]; then
+            test "$(uname -m)" = arm64
+            if ! arch -x86_64 /usr/bin/true; then
+              echo "Rosetta unavailable on this ARM runner"
+              echo 'available=false' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            test "$(arch -x86_64 /usr/sbin/sysctl -n sysctl.proc_translated)" = 1
+          else
+            test "$(uname -m)" = x86_64
+          fi
+          echo "Execution mode: $EXECUTION_MODE on $(uname -m)"
+          sysctl -n machdep.cpu.brand_string
+          echo 'available=true' >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@v4
+        if: steps.runner.outputs.available == 'true'
         with:
-          name: transcribe-engine-macos-metal
+          name: transcribe-engine-macos-cpu
           github-token: ${{ github.token }}
           run-id: 44652359099
           path: candidate
       - name: Verify exact engine and link the public API
+        if: steps.runner.outputs.available == 'true'
         run: |
           set -euo pipefail
-          test "$(uname -m)" = arm64
           git diff --exit-code 274d105ee20dbe283c7d0954b810429e96f5e6e1 -- include src ggml samples
           cd candidate
-          echo '7c3da6f37ae5be17300dfc52e34876a72df2dabd010d10b2aa48b7b562085f0a  libtranscribe_engine.dylib' | shasum -a 256 -c -
+          echo 'a9afc3eda877bc0b97d797f103ed199114cdea7a2698bdd9c26c2c64a4430223  libtranscribe_engine.dylib' | shasum -a 256 -c -
           otool -L libtranscribe_engine.dylib
           cd ..
-          clang -std=c11 -Wall -Wextra -Werror -Iinclude scripts/ci/candidate-parakeet-cpu.c \
+          clang -arch x86_64 -std=c11 -Wall -Wextra -Werror -Iinclude scripts/ci/candidate-parakeet-cpu.c \
             -L"$PWD/candidate" -ltranscribe_engine -Wl,-rpath,"$PWD/candidate" -o candidate/parakeet-cpu
           python3 - <<'PY'
           from array import array
@@ -43,15 +73,20 @@ jobs:
           Path("candidate/jfk.f32").write_bytes(array("f", (sample / 32768 for sample in samples)).tobytes())
           PY
       - name: Recognize fixture with the published Parakeet models on CPU
+        if: steps.runner.outputs.available == 'true'
         working-directory: candidate
         run: |
           set -euo pipefail
+          runner=()
+          if [[ "$EXECUTION_MODE" = Rosetta ]]; then
+            runner=(arch -x86_64)
+          fi
           check_model() {
             local repository="$1" revision="$2" artifact="$3" digest="$4"
             curl --fail --silent --show-error --location --retry 3 --output "$artifact" \
               "https://huggingface.co/handy-computer/$repository/resolve/$revision/$artifact"
             echo "$digest  $artifact" | shasum -a 256 -c -
-            ./parakeet-cpu "$artifact" jfk.f32
+            "${runner[@]}" ./parakeet-cpu "$artifact" jfk.f32
           }
           check_model parakeet-tdt-0.6b-v3-gguf d8d8c32cb2017c57e5307767343e97870f8a7f53 parakeet-tdt-0.6b-v3-Q8_0.gguf 5859f77944efcd8eafa23a6350731960b2b55b2203df51f319665c807d802cc7
           check_model parakeet-ultra-gguf a1539be1b849ea7463b88343e5277b373d0c4ea9 parakeet-ultra-Q8_0.gguf 007a59761e9258779f189df396b50d12b83bb5b79e66df4b955c230d2f2a0a59
