@@ -1,0 +1,57 @@
+name: Validate candidate Parakeet on Apple Silicon CPU
+
+on:
+  push:
+    branches: [music-round-transcribe-macos-smoke-274d105e]
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  parakeet:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/download-artifact@v4
+        with:
+          name: transcribe-engine-macos-metal
+          github-token: ${{ github.token }}
+          run-id: 44652359099
+          path: candidate
+      - name: Verify exact engine and link the public API
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = arm64
+          test "$(git rev-parse HEAD^)" = 274d105ee20dbe283c7d0954b810429e96f5e6e1
+          cd candidate
+          echo '7c3da6f37ae5be17300dfc52e34876a72df2dabd010d10b2aa48b7b562085f0a  libtranscribe_engine.dylib' | shasum -a 256 -c -
+          otool -L libtranscribe_engine.dylib
+          cd ..
+          clang -std=c11 -Wall -Wextra -Werror -Iinclude scripts/ci/candidate-parakeet-cpu.c \
+            -L"$PWD/candidate" -ltranscribe_engine -Wl,-rpath,"$PWD/candidate" -o candidate/parakeet-cpu
+          python3 - <<'PY'
+          from array import array
+          from pathlib import Path
+          import wave
+          with wave.open("samples/jfk.wav", "rb") as audio:
+              assert (audio.getnchannels(), audio.getsampwidth(), audio.getframerate(), audio.getnframes()) == (1, 2, 16000, 176000)
+              samples = array("h", audio.readframes(176000))
+          Path("candidate/jfk.f32").write_bytes(array("f", (sample / 32768 for sample in samples)).tobytes())
+          PY
+      - name: Recognize fixture with the published Parakeet models on CPU
+        working-directory: candidate
+        run: |
+          set -euo pipefail
+          check_model() {
+            local repository="$1" revision="$2" artifact="$3" digest="$4"
+            curl --fail --silent --show-error --location --retry 3 --output "$artifact" \
+              "https://huggingface.co/handy-computer/$repository/resolve/$revision/$artifact"
+            echo "$digest  $artifact" | shasum -a 256 -c -
+            ./parakeet-cpu "$artifact" jfk.f32
+          }
+          check_model parakeet-tdt-0.6b-v3-gguf d8d8c32cb2017c57e5307767343e97870f8a7f53 parakeet-tdt-0.6b-v3-Q8_0.gguf 5859f77944efcd8eafa23a6350731960b2b55b2203df51f319665c807d802cc7
+          check_model parakeet-ultra-gguf a1539be1b849ea7463b88343e5277b373d0c4ea9 parakeet-ultra-Q8_0.gguf 007a59761e9258779f189df396b50d12b83bb5b79e66df4b955c230d2f2a0a59
