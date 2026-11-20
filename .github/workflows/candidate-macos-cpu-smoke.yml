@@ -77,7 +77,7 @@ jobs:
         working-directory: candidate
         run: |
           set -euo pipefail
-          runner=()
+          runner=(env)
           if [[ "$EXECUTION_MODE" = Rosetta ]]; then
             runner=(arch -x86_64)
           fi
