@@ -24,13 +24,18 @@ permissions:
   pages: write
   id-token: write
 
-# Serialize Pages deploys; never cancel an in-flight one.
-concurrency:
-  group: pages
-  cancel-in-progress: false
-
 jobs:
   build-and-deploy:
+    # Studio engine tags ship native archives and libraries, with no wheels.
+    # Skip before requesting a self-hosted runner or a Pages environment.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (!startsWith(github.event.release.tag_name, 'studio-engine-') &&
+      !startsWith(github.event.release.tag_name, 'engine-'))
+    # Only eligible deploy jobs enter the shared Pages queue.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     runs-on: [self-hosted, Linux, X64, hetzner]
     timeout-minutes: 15
     environment:
